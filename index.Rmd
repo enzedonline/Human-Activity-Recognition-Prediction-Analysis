@@ -1,0 +1,274 @@
+---
+title: "Qualitative Activity Recognition of Weight Lifting Exercises"
+author: "Richard Allen"
+date: '2022-04-03'
+output:
+  html_document: 
+    highlight: pygments
+    theme: yeti
+    df_print: default
+    toc: yes
+---
+
+------------------------------------------------------------------------
+
+> Please refer to the [Appendix] for all code and graphs.
+
+------------------------------------------------------------------------
+
+```{r, echo = FALSE}
+# set defaults: cache chunks to speed compiling subsequent edits.
+knitr::opts_chunk$set(cache=TRUE, echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r libraries}
+library(tidyverse)
+library(caret)
+library(corrplot)
+library(rattle)
+```
+
+------------------------------------------------------------------------
+
+# Synopsis
+
+------------------------------------------------------------------------
+
+Using devices such as *Jawbone Up*, *Nike FuelBand*, and *Fitbit* it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement -- a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how *much* of a particular activity they do, but they rarely quantify *how well they do it*.
+
+The goal of this project is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and predict what class of activity was taking place based on the predictor variables in the data set.
+
+------------------------------------------------------------------------
+
+# Executive Summary
+
+------------------------------------------------------------------------
+
+The final model uses a combination of Principal Component Analysis pre-processing with Random Forest modelling giving an out-of-sample accuracy of 96.8 ± 0.6% at the 95% confidence level.
+
+------------------------------------------------------------------------
+
+# Data
+
+------------------------------------------------------------------------
+
+The training data consists of 19622 observations with 160 variables.
+
+There are 100 variables containing mostly empty or invalid data which are not considered in the model. Outside of these, there are a further 7 variables containing data irrelevant to prediction which are also removed from the the data set prior to any analysis and modelling, leaving 53 variables (52 possible predictors).
+
+The data set is randomly split 80/20 into training and testing with the testing set used solely to measure out-of-sample error rate.
+
+-   training 15699 observations
+-   testing 3923 observations
+
+------------------------------------------------------------------------
+
+# Exploratory Data Analysis Summary
+
+------------------------------------------------------------------------
+
+A test for Near-Zero Variance was made, no variables tested positive.
+
+More than half the variables showed some degree of collinearity, some heavily so.
+
+------------------------------------------------------------------------
+
+# Model Analysis Summary
+
+------------------------------------------------------------------------
+
+Please refer to [Model Analysis] in the Appendix for code and full details.
+
+------------------------------------------------------------------------
+
+## Choosing a Model
+
+------------------------------------------------------------------------
+
+An initial test using Recursive Partitioning was made. The model performed poorly with an accuracy rate of only 49.5% on out-of-sample data.
+
+Due to the high collinearity discovered in EDA, Principal Component Analysis was run with an 80% threshold. PCA reduced the predictor count from 52 to 12.
+
+The pre-processed PCA data was passed to a Random Forest training model with k-fold cross-validation, using 10 folds.
+
+------------------------------------------------------------------------
+
+## Testing the Model
+
+------------------------------------------------------------------------
+
+In-data accuracy was 100% while out-of-data accuracy showed 96.8 ± 0.6% at the 95% confidence level.
+
+------------------------------------------------------------------------
+
+## Validating the model
+
+------------------------------------------------------------------------
+
+Applying the same PCA pre-processing to the pml-testing data set and random forest model produced the following predictions:
+
+`##  [1] B A A A A E D B A A A C B A E E A B B B`
+
+`## Levels: A B C D E`
+
+With an accuracy of 96.8%, there should be no more than one misclassification (this is approximately equivalent to one misclassification per thirty predictions).
+
+------------------------------------------------------------------------
+
+# Conclusion
+
+------------------------------------------------------------------------
+
+Basic Recursive Partitioning performed poorly with this data set producing an accuracy level of only 49.5%.
+
+Principal Component Analysis and Random Forest performed extremely well, dealing with high degrees of collinearity to produce an out-of-sample error rate of 96.8 ± 0.6% at the 95% confidence level.
+
+With a sample size of 20, we would expect no more than one misclassification for the validation set (from `pml-testing.csv`).
+
+------------------------------------------------------------------------
+
+# Appendix
+
+------------------------------------------------------------------------
+
+## Data
+
+------------------------------------------------------------------------
+
+-   Read csv
+-   Set invalid values to NA filter columns with NAs
+-   Drop first 7 columns which are irrelevant to prediction
+-   Add factor to classe
+-   Split training data into train and test subsets (80/20)
+
+```{r data, echo=TRUE}
+pml.train <- read_csv('./data/pml-training.csv', na = c("", "NA", "#DIV/0!")) %>% 
+    select_if(~sum(is.na(.)) == 0) %>%
+    select(-(`...1`:num_window)) %>%
+    mutate(classe = as.factor(classe))
+
+set.seed(123456) 
+inTrain <- createDataPartition(pml.train$classe, p = 0.8, list = FALSE)
+train.data <- pml.train[inTrain, ]
+train.test <- pml.train[-inTrain, ]
+rm(inTrain)
+rm(pml.train)
+```
+
+------------------------------------------------------------------------
+
+## Exploratory Data Analysis
+
+------------------------------------------------------------------------
+
+Check for near-zero variance predictors
+
+```{r nvz, echo=TRUE}
+nearZeroVar(train.data, saveMetrics = TRUE)
+```
+
+Check collinearity
+
+```{r corr, echo=TRUE}
+# Build correlation matrix
+# order by first principal component
+corrplot(abs(cor(subset(train.data, select = -classe))), 
+         method= "square", type = "lower", title = "Correlation Matrix Analysis",
+         diag=FALSE, order="FPC", 
+         tl.cex=0.55, tl.col="black", tl.srt = 45, 
+         cl.pos = 'n', mar=c(0,0,1,0))
+```
+
+------------------------------------------------------------------------
+
+## Model Analysis
+
+------------------------------------------------------------------------
+
+### Recursive Partition Test
+
+------------------------------------------------------------------------
+
+Look at initial recursive partitioning model
+
+```{r rpart, echo=TRUE}
+fit.rpart <- train(classe ~ ., data = train.data, method = "rpart")
+```
+
+```{r rpart2}
+fancyRpartPlot(fit.rpart$finalModel, main = NULL, sub = NULL)
+confusionMatrix(train.test$classe, predict(fit.rpart, train.test))
+```
+
+Only 49.5% accuracy on test set
+
+------------------------------------------------------------------------
+
+### Principle Component Analysis
+
+------------------------------------------------------------------------
+
+Preprocess with PCA to reduce collinear predictors
+
+```{r PCA, echo=TRUE}
+preProc <- preProcess(train.data[, -which(names(train.data) == "classe")], 
+                      method="pca", thresh=0.8)
+PCA.train <- predict(preProc, train.data[, -which(names(train.data) == "classe")]) %>%
+    mutate(classe = train.data$classe)
+str(PCA.train)
+```
+
+PCA reduces to 12 predictors
+
+------------------------------------------------------------------------
+
+### Random Forest Modelling
+
+------------------------------------------------------------------------
+
+Apply random forest model with k-fold cross-validation with 10 folds on PCA processed data
+
+```{r rf, echo=TRUE}
+# use random forest
+fit.rf <- train(classe ~ ., data = PCA.train, method = "rf", 
+                trControl = trainControl(method = "cv", number = 10))
+print(fit.rf)
+```
+
+------------------------------------------------------------------------
+
+### Testing the Model
+
+------------------------------------------------------------------------
+
+```{r rfcftrain, echo=TRUE}
+cf.train <- confusionMatrix(PCA.train$classe, predict(fit.rf, PCA.train))
+cf.train
+```
+
+Accuracy on train data is `r 100*cf.train$overall[1]`%
+
+```{r rfcftest, echo=TRUE}
+#create PCA train.test data set
+PCA.test <- predict(preProc, train.test[, -which(names(train.test) == "classe")]) %>%
+    mutate(classe = train.test$classe)
+cf.test <- confusionMatrix(PCA.test$classe, predict(fit.rf, PCA.test))
+cf.test
+```
+
+Accuracy on test data is `r round(100*cf.test$overall[1],1)`%
+
+------------------------------------------------------------------------
+
+### Validation
+
+------------------------------------------------------------------------
+
+Load and predict validation data
+
+```{r validate, echo=TRUE}
+pml.validation <- read_csv('./data/pml-testing.csv', na = c("", "NA", "#DIV/0!")) 
+predict(fit.rf, predict(preProc, pml.validation))
+```
+
+------------------------------------------------------------------------
