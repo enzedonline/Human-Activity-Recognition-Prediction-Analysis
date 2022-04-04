@@ -44,7 +44,7 @@ The goal of this project is to use data from accelerometers on the belt, forearm
 
 ------------------------------------------------------------------------
 
-The final model uses a combination of Principal Component Analysis pre-processing with Random Forest modelling giving an out-of-sample accuracy of 96.8 ± 0.6% at the 95% confidence level.
+The final model uses Random Forest modelling giving an out-of-sample accuracy of 99.54% with a 95% confidence interval of 99.28% to 99.73%. Recursive Partitioning failed to produce a reliable model while pre-processing Random Forest with Principal Component Analysis degraded accuracy by approximately 3%.
 
 ------------------------------------------------------------------------
 
@@ -89,7 +89,9 @@ An initial test using Recursive Partitioning was made. The model performed poorl
 
 Due to the high collinearity discovered in EDA, Principal Component Analysis was run with an 80% threshold. PCA reduced the predictor count from 52 to 12.
 
-The pre-processed PCA data was passed to a Random Forest training model with k-fold cross-validation, using 10 folds.
+The pre-processed PCA data was passed to a Random Forest training model with k-fold cross-validation, using 10 folds. This gave an out-of-sample accuracy of 96.8%.
+
+Finally, the full 52 predictors were passed directly to Random Forest without PCA. Accuracy improved to 99.54%. This was the chosen model.
 
 ------------------------------------------------------------------------
 
@@ -97,7 +99,7 @@ The pre-processed PCA data was passed to a Random Forest training model with k-f
 
 ------------------------------------------------------------------------
 
-In-data accuracy was 100% while out-of-data accuracy showed 96.8 ± 0.6% at the 95% confidence level.
+In-data accuracy was 100% while out-of-data accuracy showed 99.54% with a 95% confidence interval of 99.28% to 99.73%.
 
 ------------------------------------------------------------------------
 
@@ -105,13 +107,10 @@ In-data accuracy was 100% while out-of-data accuracy showed 96.8 ± 0.6% at the 
 
 ------------------------------------------------------------------------
 
-Applying the same PCA pre-processing to the pml-testing data set and random forest model produced the following predictions:
+Applying the final random forest model to the pml-testing data set produced the following predictions:
 
-`##  [1] B A A A A E D B A A A C B A E E A B B B`
-
-`## Levels: A B C D E`
-
-With an accuracy of 96.8%, there should be no more than one misclassification (this is approximately equivalent to one misclassification per thirty predictions).
+    |1|  |2|  |3|  |4|  |5|  |6|  |7|  |8|  |9|  |10| |11| |12| |13| |14| |15| |16| |17| |18| |19| |20|
+     B    A    B    A    A    E    D    B    A     A    B    C    B    A    E    E    A    B    B    B  
 
 ------------------------------------------------------------------------
 
@@ -121,9 +120,13 @@ With an accuracy of 96.8%, there should be no more than one misclassification (t
 
 Basic Recursive Partitioning performed poorly with this data set producing an accuracy level of only 49.5%.
 
-Principal Component Analysis and Random Forest performed extremely well, dealing with high degrees of collinearity to produce an out-of-sample error rate of 96.8 ± 0.6% at the 95% confidence level.
+Principal Component Analysis and Random Forest performed well, dealing with high degrees of collinearity to produce an out-of-sample error rate of 96.8 ± 0.6% at the 95% confidence level.
 
-With a sample size of 20, we would expect no more than one misclassification for the validation set (from `pml-testing.csv`).
+Running Random Forest against the full 52 predictor set achieved an out-of-data accuracy showed 99.54% with a 95% confidence interval of 99.28% to 99.73%.
+
+While PCA can be used to reduce variables with collinearity, the result is a loss of accuracy, Random Forest does a better job of dealing with this.
+
+With a sample size of 20, we would expect no misclassifications for the validation set (from `pml-testing.csv`).
 
 ------------------------------------------------------------------------
 
@@ -222,7 +225,7 @@ PCA reduces to 12 predictors
 
 ------------------------------------------------------------------------
 
-### Random Forest Modelling
+### Random Forest Modelling with PCA
 
 ------------------------------------------------------------------------
 
@@ -260,6 +263,25 @@ Accuracy on test data is `r round(100*cf.test$overall[1],1)`%
 
 ------------------------------------------------------------------------
 
+### Random Forest Modelling without PCA
+
+------------------------------------------------------------------------
+
+Run random forest on full training data without PCA to test if PCA adversely affects accuracy.
+
+```{r rf-noPCA}
+fit.rf2 <- train(classe ~ ., data = train.data, method = "rf", 
+                trControl = trainControl(method = "cv", number = 5))
+print(fit.rf2)
+confusionMatrix(train.test$classe, predict(fit.rf2, train.test))
+```
+
+Accuracy on test data is 99.54% with a 95% confidence interval of 99.28% to 99.73%.
+
+This is a good improvement on the model using PCA and will be used going forward.
+
+------------------------------------------------------------------------
+
 ### Validation
 
 ------------------------------------------------------------------------
@@ -268,7 +290,7 @@ Load and predict validation data
 
 ```{r validate, echo=TRUE}
 pml.validation <- read_csv('./data/pml-testing.csv', na = c("", "NA", "#DIV/0!")) 
-predict(fit.rf, predict(preProc, pml.validation))
+t(as.data.frame(predict(fit.rf2, pml.validation))) %>% `rownames<-`( NULL )
 ```
 
 ------------------------------------------------------------------------

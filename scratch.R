@@ -81,3 +81,18 @@ alpha <- 0.05;
 crit <- qt(alpha/2, df = n-1, lower.tail = FALSE)
 MEAN <- (l+u)/2
 SD   <- (u-l)*sqrt(n)/(2*crit)
+
+#RF without PCA
+# use random forest
+fit.rf2 <- train(classe ~ ., data = train.data, method = "rf", 
+                trControl = trainControl(method = "cv", number = 5))
+print(fit.rf2)
+
+confusionMatrix(train.test$classe, predict(fit.rf2, train.test))
+winflashr::winflash()
+
+##                Accuracy : 0.9954          
+##                  95% CI : (0.9928, 0.9973)
+
+pml.validation <- read_csv('./data/pml-testing.csv', na = c("", "NA", "#DIV/0!")) 
+view(as.data.frame(predict(fit.rf2, pml.validation)))
