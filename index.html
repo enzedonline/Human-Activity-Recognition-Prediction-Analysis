@@ -635,9 +635,10 @@ the validation set (from <code>pml-testing.csv</code>).</p>
 <hr />
 <ul>
 <li>Read csv</li>
-<li>Set invalid values to NA filter columns with NAs</li>
+<li>Set empty &amp; invalid values to NA</li>
+<li>Drop columns with NAs</li>
 <li>Drop first 7 columns which are irrelevant to prediction</li>
-<li>Add factor to classe</li>
+<li>Add factor to <code>classe</code></li>
 <li>Split training data into train and test subsets (80/20)</li>
 </ul>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>pml.train <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&#39;./data/pml-training.csv&#39;</span>, <span class="at">na =</span> <span class="fu">c</span>(<span class="st">&quot;&quot;</span>, <span class="st">&quot;NA&quot;</span>, <span class="st">&quot;#DIV/0!&quot;</span>)) <span class="sc">%&gt;%</span> </span>

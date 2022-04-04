@@ -139,9 +139,10 @@ With a sample size of 20, we would expect no misclassifications for the validati
 ------------------------------------------------------------------------
 
 -   Read csv
--   Set invalid values to NA filter columns with NAs
+-   Set empty & invalid values to NA
+-   Drop columns with NAs
 -   Drop first 7 columns which are irrelevant to prediction
--   Add factor to classe
+-   Add factor to `classe`
 -   Split training data into train and test subsets (80/20)
 
 ```{r data, echo=TRUE}
